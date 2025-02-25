@@ -14,17 +14,17 @@ Ensure you have **R** installed and set up a suitable Python environment for MOF
 - Installs MOFA2 and other required packages (`devtools`, `ggplot2`, etc.).
 
 ### 2. Load Required Libraries
-- Loads essential libraries including `MOFA2`, `ggplot2`, `tidyverse`, and `reticulate`.
+- Loads essential libraries including `MOFA2`, `ggplot2`, `tidyverse`, `reticulate`, `randomForest`, `utils`, `survival`, and `survminer`.
 
 ### 3. Configure Python Environment
 - Specifies a Python executable for MOFA2 operations.
 
 ### 4. Load Omics Data
-- Reads multiple CSV files from `D:/Data of 57375/MOFA/cll_data`.
+- Reads multiple CSV files from `../Dataset/cll_data`.
 - Stores them in a named list (`CLL_data`).
 
 ### 5. Load Metadata
-- Reads metadata from `D:/Data of 57375/MOFA/cll_metadata`.
+- Reads metadata from `../Dataset/cll_metadata`.
 
 ### 6. Convert Data to Matrix Format
 - Converts each omic dataset into a data matrix for MOFA2 compatibility.
