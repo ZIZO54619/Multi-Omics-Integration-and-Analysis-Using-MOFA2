@@ -38,12 +38,12 @@ library(survminer)
 py_config()
 
 # Use specific Python executable
-use_python("C:/Users/Abdulaziz/Documents/.virtualenvs/r-reticulate/Scripts/python.exe")
+use_python("../python.exe")
 
 
 ## ----------------------------------------------------------------
 # Define data path
-path <- "D:/Data of 57375/MOFA/cll_data"
+path <- "../Dataset/cll_data"
 
 # List files in the data path
 files <- list.files(path)
@@ -73,7 +73,7 @@ CLL_data
 
 ## ----------------------------------------------------------------
 # Define metadata path
-meta_path <- "D:/Data of 57375/MOFA/cll_metadata"
+meta_path <- "../Dataset/cll_metadata"
 
 # List metadata files
 meta_files <- list.files(path = meta_path, pattern = "\\.csv$", full.names = TRUE)
@@ -125,7 +125,7 @@ MOFAobject <- prepare_mofa(MOFAobject,
                            training_options = train_opts
 )
 # Run MOFA analysis
-MOFAobject <- run_mofa(MOFAobject, outfile = "D:/Data of 57375/MOFA/MOFA2_CLL.hdf5", use_basilisk = FALSE)
+MOFAobject <- run_mofa(MOFAobject, outfile = "../Dataset/MOFA2_CLL.hdf5", use_basilisk = FALSE)
 
 # Save MOFA object
 saveRDS(MOFAobject, "MOFA2_CLL.rds")
