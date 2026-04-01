@@ -51,43 +51,55 @@ use_python("../python.exe")
 ## Load Data
 
 ```r
-# Define data path
-path <- "../Dataset/cll_data"
+# Resolve project root and dataset paths robustly
+script_path <- tryCatch(normalizePath(sys.frame(1)$ofile), error = function(e) NA)
+if (is.na(script_path)) {
+  script_path <- normalizePath(getwd())
+}
+project_root <- if (file.info(script_path)$isdir) script_path else dirname(script_path)
+data_path <- file.path(project_root, "Dataset", "cll_data")
+meta_path <- file.path(project_root, "Dataset", "cll_metadata")
 
-# List files in the data path
-files <- list.files(path)
-files
+# Validate directories exist
+if (!dir.exists(data_path)) {
+  stop(sprintf("Expected data directory does not exist: %s", data_path))
+}
+if (!dir.exists(meta_path)) {
+  stop(sprintf("Expected metadata directory does not exist: %s", meta_path))
+}
+
+# Validate expected view CSVs
+expected_views <- c("Drugs", "Methylation", "mRNA", "Mutations")
+expected_view_files <- file.path(data_path, expected_views, paste0(expected_views, ".csv"))
+missing_view_files <- expected_view_files[!file.exists(expected_view_files)]
+if (length(missing_view_files) > 0) {
+  stop(sprintf("Missing expected view CSV file(s):\n- %s", paste(missing_view_files, collapse = "\n- ")))
+}
+
+# Metadata must resolve to exactly one CSV (deterministic)
+meta_files <- sort(list.files(path = meta_path, pattern = "\\.csv$", full.names = TRUE))
+if (length(meta_files) != 1) {
+  stop(sprintf("Expected exactly 1 metadata CSV in %s, found %d.", meta_path, length(meta_files)))
+}
 
 # Initialize an empty list to store omics data
 CLL_data <- list()
 
-# Loop through each directory in the main path
-for (file_name in files) {
-    sub_path <- file.path(path, "/", file_name)
-    # Get list of CSV files within subfolders
-    sub_files <- list.files(path = sub_path, pattern = "\\.csv$", full.names = TRUE)
-    # Loop through the CSV files
-    for (i in seq_along(sub_files)) {
-      omic <- read.csv(sub_files[i])
-      rownames(omic) <- omic$X
-      omic$X <- NULL
-      CLL_data[[length(CLL_data) + 1]] <- omic
-    }
-  }
+# Read each view in deterministic order
+for (view_name in expected_views) {
+  view_file <- file.path(data_path, view_name, paste0(view_name, ".csv"))
+  omic <- read.csv(view_file)
+  rownames(omic) <- omic$X
+  omic$X <- NULL
+  CLL_data[[length(CLL_data) + 1]] <- omic
+}
 
 # Set names of omics data list
-names(CLL_data) <- c("Drugs", "Methylation", "mRNA", "Mutations")
+names(CLL_data) <- expected_views
 CLL_data
 ```
 
 ```r
-# Define metadata path
-meta_path <- "../Dataset/cll_metadata"
-
-# List metadata files
-meta_files <- list.files(path = meta_path, pattern = "\\.csv$", full.names = TRUE)
-meta_files
-
 # Read metadata CSV file
 metadata <- read.csv(meta_files[1])
 metadata
@@ -96,6 +108,19 @@ metadata
 for (i in seq_along(CLL_data)) {
   CLL_data[[i]] <- data.matrix(CLL_data[[i]])
 }
+```
+
+Expected dataset layout:
+
+```text
+Dataset/
+├── cll_data/
+│   ├── Drugs/Drugs.csv
+│   ├── Methylation/Methylation.csv
+│   ├── mRNA/mRNA.csv
+│   └── Mutations/Mutations.csv
+└── cll_metadata/
+    └── <single_metadata_file>.csv
 ```
 
 ## Create MOFA

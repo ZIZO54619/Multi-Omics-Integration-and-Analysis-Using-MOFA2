@@ -20,11 +20,19 @@ Ensure you have **R** installed and set up a suitable Python environment for MOF
 - Specifies a Python executable for MOFA2 operations.
 
 ### 4. Load Omics Data
-- Reads multiple CSV files from `../Dataset/cll_data`.
+- Resolves paths from the script/repository directory using `file.path(project_root, "Dataset", ...)`.
+- Verifies that `Dataset/cll_data` and `Dataset/cll_metadata` directories exist.
+- Verifies expected CSV files exist for all four views:
+  - `Dataset/cll_data/Drugs/Drugs.csv`
+  - `Dataset/cll_data/Methylation/Methylation.csv`
+  - `Dataset/cll_data/mRNA/mRNA.csv`
+  - `Dataset/cll_data/Mutations/Mutations.csv`
 - Stores them in a named list (`CLL_data`).
 
 ### 5. Load Metadata
-- Reads metadata from `../Dataset/cll_metadata`.
+- Reads metadata from `Dataset/cll_metadata`.
+- Requires exactly one metadata CSV file (deterministic selection via sorted file list, then strict count check).
+- Stops with actionable `stop()` errors when directories/files are missing.
 
 ### 6. Convert Data to Matrix Format
 - Converts each omic dataset into a data matrix for MOFA2 compatibility.
@@ -54,10 +62,21 @@ Ensure you have **R** installed and set up a suitable Python environment for MOF
 - Various plots and visualizations are generated to interpret multi-omics relationships.
 
 ## Notes
-- Ensure that the specified paths for data and metadata exist.
+- Ensure the dataset is organized under the repository `Dataset/` directory as shown below:
+
+```text
+Dataset/
+├── cll_data/
+│   ├── Drugs/Drugs.csv
+│   ├── Methylation/Methylation.csv
+│   ├── mRNA/mRNA.csv
+│   └── Mutations/Mutations.csv
+└── cll_metadata/
+    └── <single_metadata_file>.csv
+```
+
 - Adjust the number of factors and training options based on the dataset.
 - Use `reticulate` to properly configure Python dependencies if needed.
 
 ## Contact
 For issues or questions, feel free to reach out!
-
