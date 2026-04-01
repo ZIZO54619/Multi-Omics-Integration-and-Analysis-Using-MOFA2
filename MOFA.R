@@ -1,27 +1,31 @@
 ## ----------------------------------------------------------------
-# Set CRAN repository
-options(repos = c(CRAN = "https://cloud.r-project.org/"))
-
-# Install BiocManager if not already installed
-if (!require("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
-
-# Load BiocManager
-library(BiocManager)
-
-# Install MOFA2 package
-BiocManager::install("MOFA2", force = TRUE)
-
-# Install devtools package
-install.packages("devtools")
-
-# Install a specific version of ggplot2
-devtools::install_version("ggplot2", version = "3.5.1")
-
-
-## ----------------------------------------------------------------
 # Load required libraries
-library(devtools)
+required_packages <- c(
+  "MOFA2",
+  "data.table",
+  "ggplot2",
+  "tidyverse",
+  "reticulate",
+  "randomForest",
+  "survival",
+  "survminer"
+)
+
+missing_packages <- required_packages[!vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)]
+if (length(missing_packages) > 0) {
+  stop(
+    paste(
+      "Missing required R package(s):",
+      paste(missing_packages, collapse = ", "),
+      "\nInstall them before running MOFA.R.",
+      "\nExample:",
+      "\n  install.packages(c('data.table','ggplot2','tidyverse','reticulate','randomForest','survival','survminer'))",
+      "\n  if (!requireNamespace('BiocManager', quietly = TRUE)) install.packages('BiocManager')",
+      "\n  BiocManager::install('MOFA2')"
+    )
+  )
+}
+
 library(MOFA2)
 library(data.table)
 library(ggplot2)
@@ -147,26 +151,55 @@ mofa_rds_path <- file.path(project_root, "MOFA2_CLL.rds")
 # Explicit opt-in required for remote demo mode
 allow_remote_demo <- identical(tolower(Sys.getenv("MOFA_ALLOW_REMOTE_DEMO", unset = "false")), "true")
 
-# Initialize an empty list to store omics data
-CLL_data <- list()
+# Initialize a named list to store omics data (deterministic view mapping)
+CLL_data <- setNames(vector("list", length(expected_views)), expected_views)
 
 # Loop through expected views in deterministic order
 for (view_name in expected_views) {
   view_file <- file.path(data_path, view_name, paste0(view_name, ".csv"))
-  omic <- read.csv(view_file)
+  omic <- read.csv(view_file, check.names = FALSE)
+
+  if (!"X" %in% colnames(omic)) {
+    stop(
+      sprintf(
+        "View '%s' is missing the feature ID column named 'X': %s",
+        view_name,
+        view_file
+      )
+    )
+  }
+
   rownames(omic) <- omic$X
   omic$X <- NULL
-  CLL_data[[length(CLL_data) + 1]] <- omic
+  CLL_data[[view_name]] <- omic
 }
 
-# Set names of omics data list
-names(CLL_data) <- expected_views
 CLL_data
 
 
 ## ----------------------------------------------------------------
 # Read metadata CSV file
 metadata <- read.csv(meta_files[1])
+
+if (!"sample" %in% colnames(metadata)) {
+  stop(
+    sprintf(
+      "Metadata file must include a 'sample' column: %s",
+      meta_files[1]
+    )
+  )
+}
+
+if (anyDuplicated(metadata$sample) > 0) {
+  duplicated_samples <- unique(metadata$sample[duplicated(metadata$sample)])
+  stop(
+    sprintf(
+      "Metadata contains duplicate sample IDs in column 'sample': %s",
+      paste(duplicated_samples, collapse = ", ")
+    )
+  )
+}
+
 metadata
 
 # Convert each omic data frame to a data matrix
@@ -268,7 +301,44 @@ dim(MOFAobject@expectations$W$mRNA)
 
 ## ----------------------------------------------------------------
 # Check if sample names are consistent between MOFA and metadata
-stopifnot(all(sort(metadata$sample) == sort(unlist(samples_names(MOFAobject)))))
+mofa_samples <- unlist(samples_names(MOFAobject))
+
+missing_in_metadata <- setdiff(mofa_samples, metadata$sample)
+if (length(missing_in_metadata) > 0) {
+  stop(
+    sprintf(
+      "Metadata is missing %d sample(s) required by MOFA object: %s",
+      length(missing_in_metadata),
+      paste(missing_in_metadata, collapse = ", ")
+    )
+  )
+}
+
+extra_in_metadata <- setdiff(metadata$sample, mofa_samples)
+if (length(extra_in_metadata) > 0) {
+  stop(
+    sprintf(
+      "Metadata contains %d sample(s) not present in MOFA object: %s",
+      length(extra_in_metadata),
+      paste(extra_in_metadata, collapse = ", ")
+    )
+  )
+}
+
+# Reorder metadata to match MOFA sample order and verify strict alignment
+metadata <- metadata[match(mofa_samples, metadata$sample), , drop = FALSE]
+
+if (!identical(metadata$sample, mofa_samples)) {
+  mismatch_idx <- which(metadata$sample != mofa_samples)[1]
+  stop(
+    sprintf(
+      "Sample ordering mismatch after metadata alignment at position %d: metadata='%s' vs MOFA='%s'",
+      mismatch_idx,
+      metadata$sample[mismatch_idx],
+      mofa_samples[mismatch_idx]
+    )
+  )
+}
 
 # Add metadata to MOFA object
 samples_metadata(MOFAobject) <- metadata
