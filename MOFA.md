@@ -145,26 +145,34 @@ mofa_rds_path <- file.path(project_root, "MOFA2_CLL.rds")
 # Remote demo requires explicit opt-in
 allow_remote_demo <- identical(tolower(Sys.getenv("MOFA_ALLOW_REMOTE_DEMO", unset = "false")), "true")
 
-# Initialize an empty list to store omics data
-CLL_data <- list()
+# Initialize a named list to store omics data (deterministic view mapping)
+CLL_data <- setNames(vector("list", length(expected_views)), expected_views)
 
 # Read each view in deterministic order
 for (view_name in expected_views) {
   view_file <- file.path(data_path, view_name, paste0(view_name, ".csv"))
-  omic <- read.csv(view_file)
+  omic <- read.csv(view_file, check.names = FALSE)
+  if (!"X" %in% colnames(omic)) {
+    stop(sprintf("View '%s' is missing the feature ID column named 'X': %s", view_name, view_file))
+  }
   rownames(omic) <- omic$X
   omic$X <- NULL
-  CLL_data[[length(CLL_data) + 1]] <- omic
+  CLL_data[[view_name]] <- omic
 }
-
-# Set names of omics data list
-names(CLL_data) <- expected_views
 CLL_data
 ```
 
 ```r
 # Read metadata CSV file
 metadata <- read.csv(meta_files[1])
+
+if (!"sample" %in% colnames(metadata)) {
+  stop(sprintf("Metadata file must include a 'sample' column: %s", meta_files[1]))
+}
+if (anyDuplicated(metadata$sample) > 0) {
+  duplicated_samples <- unique(metadata$sample[duplicated(metadata$sample)])
+  stop(sprintf("Metadata contains duplicate sample IDs in column 'sample': %s", paste(duplicated_samples, collapse = ", ")))
+}
 metadata
 
 # Convert each omic data frame to a data matrix
@@ -273,7 +281,21 @@ dim(MOFAobject@expectations$W$mRNA)
 
 ```r
 # Check if sample names are consistent between MOFA and metadata
-stopifnot(all(sort(metadata$sample) == sort(unlist(samples_names(MOFAobject)))))
+mofa_samples <- unlist(samples_names(MOFAobject))
+missing_in_metadata <- setdiff(mofa_samples, metadata$sample)
+if (length(missing_in_metadata) > 0) {
+  stop(sprintf("Metadata is missing %d sample(s) required by MOFA object: %s", length(missing_in_metadata), paste(missing_in_metadata, collapse = ", ")))
+}
+extra_in_metadata <- setdiff(metadata$sample, mofa_samples)
+if (length(extra_in_metadata) > 0) {
+  stop(sprintf("Metadata contains %d sample(s) not present in MOFA object: %s", length(extra_in_metadata), paste(extra_in_metadata, collapse = ", ")))
+}
+metadata <- metadata[match(mofa_samples, metadata$sample), , drop = FALSE]
+if (!identical(metadata$sample, mofa_samples)) {
+  mismatch_idx <- which(metadata$sample != mofa_samples)[1]
+  stop(sprintf("Sample ordering mismatch after metadata alignment at position %d: metadata='%s' vs MOFA='%s'",
+               mismatch_idx, metadata$sample[mismatch_idx], mofa_samples[mismatch_idx]))
+}
 
 # Add metadata to MOFA object
 samples_metadata(MOFAobject) <- metadata
