@@ -122,6 +122,31 @@ if (length(meta_files) != 1) {
   )
 }
 
+# Configure MOFA model source
+# Allowed values:
+# - "train": train a new model and save outputs.
+# - "load_local": load an existing model from local .rds or .hdf5.
+# - "load_remote_demo": load the public CLL demo model from EBI (demo-only path).
+model_source <- "train"
+allowed_model_sources <- c("train", "load_local", "load_remote_demo")
+if (!model_source %in% allowed_model_sources) {
+  stop(
+    sprintf(
+      "Invalid model_source '%s'. Allowed values are: %s",
+      model_source,
+      paste(allowed_model_sources, collapse = ", ")
+    )
+  )
+}
+message(sprintf("MOFA model source active: %s", model_source))
+
+# Output/input paths used by train/load_local modes
+mofa_hdf5_path <- file.path(project_root, "Dataset", "MOFA2_CLL.hdf5")
+mofa_rds_path <- file.path(project_root, "MOFA2_CLL.rds")
+
+# Explicit opt-in required for remote demo mode
+allow_remote_demo <- identical(tolower(Sys.getenv("MOFA_ALLOW_REMOTE_DEMO", unset = "false")), "true")
+
 # Initialize an empty list to store omics data
 CLL_data <- list()
 
@@ -180,19 +205,45 @@ train_opts
 
 ## ----------------------------------------------------------------
 # Prepare the MOFA object with set options
-MOFAobject <- prepare_mofa(MOFAobject,
-                           data_options = data_opts,
-                           model_options = model_opts,
-                           training_options = train_opts
-)
-# Run MOFA analysis
-MOFAobject <- run_mofa(MOFAobject, outfile = "../Dataset/MOFA2_CLL.hdf5", use_basilisk = FALSE)
+if (model_source == "train") {
+  MOFAobject <- prepare_mofa(
+    MOFAobject,
+    data_options = data_opts,
+    model_options = model_opts,
+    training_options = train_opts
+  )
 
-# Save MOFA object
-saveRDS(MOFAobject, "MOFA2_CLL.rds")
-
-# Load MOFA object from an external URL
-MOFAobject <- readRDS(url("http://ftp.ebi.ac.uk/pub/databases/mofa/cll_vignette/MOFA2_CLL.rds"))
+  MOFAobject <- run_mofa(MOFAobject, outfile = mofa_hdf5_path, use_basilisk = FALSE)
+  saveRDS(MOFAobject, mofa_rds_path)
+  message(sprintf("Trained MOFA model and saved outputs:\n- %s\n- %s", mofa_hdf5_path, mofa_rds_path))
+} else if (model_source == "load_local") {
+  if (file.exists(mofa_rds_path)) {
+    MOFAobject <- readRDS(mofa_rds_path)
+    message(sprintf("Loaded local MOFA model from RDS: %s", mofa_rds_path))
+  } else if (file.exists(mofa_hdf5_path)) {
+    MOFAobject <- load_model(mofa_hdf5_path)
+    message(sprintf("Loaded local MOFA model from HDF5: %s", mofa_hdf5_path))
+  } else {
+    stop(
+      sprintf(
+        "model_source='load_local' but no local model file found.\nChecked:\n- %s\n- %s",
+        mofa_rds_path,
+        mofa_hdf5_path
+      )
+    )
+  }
+} else if (model_source == "load_remote_demo") {
+  if (!allow_remote_demo) {
+    stop(
+      paste(
+        "Remote demo loading is disabled by default.",
+        "Set MOFA_ALLOW_REMOTE_DEMO=true to explicitly opt in to model_source='load_remote_demo'."
+      )
+    )
+  }
+  MOFAobject <- readRDS(url("http://ftp.ebi.ac.uk/pub/databases/mofa/cll_vignette/MOFA2_CLL.rds"))
+  message("Loaded remote demo MOFA model from EBI FTP.")
+}
 
 
 ## ----------------------------------------------------------------
