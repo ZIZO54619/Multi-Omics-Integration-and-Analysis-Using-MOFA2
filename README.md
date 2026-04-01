@@ -17,7 +17,30 @@ Ensure you have **R** installed and set up a suitable Python environment for MOF
 - Loads essential libraries including `MOFA2`, `ggplot2`, `tidyverse`, `reticulate`, `randomForest`, `utils`, `survival`, and `survminer`.
 
 ### 3. Configure Python Environment
-- Specifies a Python executable for MOFA2 operations.
+- If `MOFA_PYTHON` is set, the script forces that interpreter with `use_python(..., required = TRUE)`.
+- If `MOFA_PYTHON` is not set, the script relies on reticulate's default Python discovery.
+- After Python selection, the script runs `py_config()` and fails fast with a clear error if Python cannot be initialized.
+- The script also validates that the Python package `mofapy2` is available before model training.
+
+Example commands:
+
+```bash
+# Linux/macOS
+export MOFA_PYTHON=/opt/miniconda3/envs/mofa/bin/python
+Rscript MOFA.R
+```
+
+```powershell
+# Windows PowerShell
+$env:MOFA_PYTHON="C:\Users\you\miniconda3\envs\mofa\python.exe"
+Rscript .\MOFA.R
+```
+
+```cmd
+:: Windows cmd.exe
+set MOFA_PYTHON=C:\Users\you\miniconda3\envs\mofa\python.exe
+Rscript MOFA.R
+```
 
 ### 4. Load Omics Data
 - Resolves paths from the script/repository directory using `file.path(project_root, "Dataset", ...)`.
