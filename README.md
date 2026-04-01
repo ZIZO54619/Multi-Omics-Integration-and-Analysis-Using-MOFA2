@@ -1,28 +1,50 @@
-# MOFA2 Analysis Pipeline
+# MOFA2 Analysis Pipeline (CLL Multi-Omics)
 
-## Overview
-This script provides a complete workflow for analyzing multi-omics data using the **MOFA2** package in R. It includes data preprocessing, MOFA model training, and visualization of the results.
+This repository contains an R workflow (`MOFA.R`) for training or loading a MOFA2 model on CLL multi-omics data, then running downstream visualization and analysis.
 
-## Prerequisites
-Ensure you have **R** installed and set up a suitable Python environment for MOFA2. The script installs necessary packages and dependencies.
+## Repository layout
 
-## Steps in the Script
+```text
+.
+├── MOFA.R
+├── MOFA.md
+├── Dataset/
+│   ├── cll_data/
+│   │   ├── Drugs/Drugs.csv
+│   │   ├── Methylation/Methylation.csv
+│   │   ├── mRNA/mRNA.csv
+│   │   └── Mutations/Mutations.csv
+│   └── cll_metadata/
+│       └── <single_metadata_file>.csv
+└── Plots/
+```
 
-### 1. Install Required Packages
-- Sets the CRAN repository.
-- Installs `BiocManager` if not available.
-- Installs MOFA2 and other required packages (`devtools`, `ggplot2`, etc.).
+## 1) Environment setup (run once)
 
-### 2. Load Required Libraries
-- Loads essential libraries including `MOFA2`, `ggplot2`, `tidyverse`, `reticulate`, `randomForest`, `utils`, `survival`, and `survminer`.
+`MOFA.R` does **not** install dependencies automatically. Install R and Python dependencies first.
 
-### 3. Configure Python Environment
-- If `MOFA_PYTHON` is set, the script forces that interpreter with `use_python(..., required = TRUE)`.
-- If `MOFA_PYTHON` is not set, the script relies on reticulate's default Python discovery.
-- After Python selection, the script runs `py_config()` and fails fast with a clear error if Python cannot be initialized.
-- The script also validates that the Python package `mofapy2` is available before model training.
+### R packages
 
-Example commands:
+```r
+install.packages(c(
+  "data.table", "ggplot2", "tidyverse", "reticulate",
+  "randomForest", "survival", "survminer"
+))
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+BiocManager::install("MOFA2")
+```
+
+### Python package (for MOFA backend)
+
+Install `mofapy2` in the Python environment that reticulate will use:
+
+```bash
+pip install mofapy2
+```
+
+## 2) Python selection
+
+You can optionally pin the Python interpreter via `MOFA_PYTHON`.
 
 ```bash
 # Linux/macOS
@@ -36,70 +58,42 @@ $env:MOFA_PYTHON="C:\Users\you\miniconda3\envs\mofa\python.exe"
 Rscript .\MOFA.R
 ```
 
-```cmd
-:: Windows cmd.exe
-set MOFA_PYTHON=C:\Users\you\miniconda3\envs\mofa\python.exe
+If `MOFA_PYTHON` is not set, reticulate default discovery is used.
+
+## 3) Model source modes
+
+In `MOFA.R`, choose one mode via `model_source`:
+
+- `"train"`: train a new model and save outputs.
+- `"load_local"`: load `MOFA2_CLL.rds` (or fallback HDF5) from local paths.
+- `"load_remote_demo"`: load remote demo model (disabled unless `MOFA_ALLOW_REMOTE_DEMO=true`).
+
+## 4) Runtime behavior and fail-fast checks
+
+`MOFA.R` performs explicit checks before analysis:
+
+- required R packages available
+- Python initializes successfully via reticulate
+- Python module `mofapy2` available
+- expected dataset directories/files exist
+- metadata file count is deterministic (exactly one CSV)
+- each omics view contains feature-id column `X`
+- metadata has `sample`, no duplicates, and aligns exactly with MOFA sample order
+
+## 5) Run
+
+From repo root:
+
+```bash
 Rscript MOFA.R
 ```
 
-### 4. Load Omics Data
-- Resolves paths from the script/repository directory using `file.path(project_root, "Dataset", ...)`.
-- Verifies that `Dataset/cll_data` and `Dataset/cll_metadata` directories exist.
-- Verifies expected CSV files exist for all four views:
-  - `Dataset/cll_data/Drugs/Drugs.csv`
-  - `Dataset/cll_data/Methylation/Methylation.csv`
-  - `Dataset/cll_data/mRNA/mRNA.csv`
-  - `Dataset/cll_data/Mutations/Mutations.csv`
-- Stores them in a named list (`CLL_data`).
+## Notes on scientific settings
 
-### 5. Load Metadata
-- Reads metadata from `Dataset/cll_metadata`.
-- Requires exactly one metadata CSV file (deterministic selection via sorted file list, then strict count check).
-- Stops with actionable `stop()` errors when directories/files are missing.
+The script intentionally keeps analytical choices unchanged (unless explicitly approved), including:
 
-### 6. Convert Data to Matrix Format
-- Converts each omic dataset into a data matrix for MOFA2 compatibility.
-
-### 7. Create and Prepare MOFA Model
-- Initializes a **MOFA object** with the omics data.
-- Configures model training options (number of factors, convergence mode, random seed).
-- Runs MOFA2 analysis and saves the trained model.
-
-### 8. Data Inspection
-- Checks sample names consistency.
-- Adds metadata to MOFA object.
-- Inspects slot names, expectations, and data dimensions.
-
-### 9. Data Visualization
-- Plots correlation between factors.
-- Plots variance explained by factors.
-- Correlates factors with clinical covariates.
-- Plots feature weights, heatmaps, and scatter plots for different views.
-
-### 10. Factor Analysis
-- Visualizes important factors using violin plots and heatmaps.
-- Analyzes relationships between omics data and clinical parameters.
-
-## Output
-- The trained MOFA object is saved as `MOFA2_CLL.rds`.
-- Various plots and visualizations are generated to interpret multi-omics relationships.
-
-## Notes
-- Ensure the dataset is organized under the repository `Dataset/` directory as shown below:
-
-```text
-Dataset/
-├── cll_data/
-│   ├── Drugs/Drugs.csv
-│   ├── Methylation/Methylation.csv
-│   ├── mRNA/mRNA.csv
-│   └── Mutations/Mutations.csv
-└── cll_metadata/
-    └── <single_metadata_file>.csv
-```
-
-- Adjust the number of factors and training options based on the dataset.
-- Use `reticulate` to properly configure Python dependencies if needed.
-
-## Contact
-For issues or questions, feel free to reach out!
+- `model_opts$num_factors <- 15`
+- `train_opts$convergence_mode <- "slow"`
+- covariates `Gender`, `died`, `age`
+- random forest logic for missing IGHV/trisomy12
+- survival endpoint/cutpoint flow (`TTT`, `treatedAfter`)

@@ -1,27 +1,31 @@
 ## ----------------------------------------------------------------
-# Set CRAN repository
-options(repos = c(CRAN = "https://cloud.r-project.org/"))
-
-# Install BiocManager if not already installed
-if (!require("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
-
-# Load BiocManager
-library(BiocManager)
-
-# Install MOFA2 package
-BiocManager::install("MOFA2", force = TRUE)
-
-# Install devtools package
-install.packages("devtools")
-
-# Install a specific version of ggplot2
-devtools::install_version("ggplot2", version = "3.5.1")
-
-
-## ----------------------------------------------------------------
 # Load required libraries
-library(devtools)
+required_packages <- c(
+  "MOFA2",
+  "data.table",
+  "ggplot2",
+  "tidyverse",
+  "reticulate",
+  "randomForest",
+  "survival",
+  "survminer"
+)
+
+missing_packages <- required_packages[!vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)]
+if (length(missing_packages) > 0) {
+  stop(
+    paste(
+      "Missing required R package(s):",
+      paste(missing_packages, collapse = ", "),
+      "\nInstall them before running MOFA.R.",
+      "\nExample:",
+      "\n  install.packages(c('data.table','ggplot2','tidyverse','reticulate','randomForest','survival','survminer'))",
+      "\n  if (!requireNamespace('BiocManager', quietly = TRUE)) install.packages('BiocManager')",
+      "\n  BiocManager::install('MOFA2')"
+    )
+  )
+}
+
 library(MOFA2)
 library(data.table)
 library(ggplot2)
