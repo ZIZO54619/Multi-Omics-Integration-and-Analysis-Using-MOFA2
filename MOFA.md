@@ -41,11 +41,58 @@ library(survminer)
 ## Python Configuration
 
 ```r
-# Configure Python environment
-py_config()
+# Optionally force a specific Python interpreter
+configured_python <- Sys.getenv("MOFA_PYTHON", unset = "")
+if (nzchar(configured_python)) {
+  use_python(configured_python, required = TRUE)
+} else {
+  message("MOFA_PYTHON is not set; using reticulate default Python discovery.")
+}
 
-# Use specific Python executable
-use_python("../python.exe")
+# Validate Python availability
+python_config <- tryCatch(
+  py_config(),
+  error = function(e) {
+    stop(
+      paste(
+        "Unable to initialize Python via reticulate.",
+        "Install Python and required packages, or set MOFA_PYTHON to a valid interpreter path.",
+        sprintf("Original error: %s", conditionMessage(e))
+      )
+    )
+  }
+)
+
+# Validate MOFA backend availability
+if (!py_module_available("mofapy2")) {
+  stop(
+    paste(
+      "Python was found, but the MOFA backend package 'mofapy2' is unavailable.",
+      "Install it in the active Python environment (for example: pip install mofapy2)",
+      "or set MOFA_PYTHON to a Python interpreter where 'mofapy2' is installed."
+    )
+  )
+}
+```
+
+### Example: set `MOFA_PYTHON` before running
+
+```bash
+# Linux/macOS (bash/zsh)
+export MOFA_PYTHON=/opt/miniconda3/envs/mofa/bin/python
+Rscript MOFA.R
+```
+
+```powershell
+# Windows PowerShell
+$env:MOFA_PYTHON="C:\Users\you\miniconda3\envs\mofa\python.exe"
+Rscript .\MOFA.R
+```
+
+```cmd
+:: Windows cmd.exe
+set MOFA_PYTHON=C:\Users\you\miniconda3\envs\mofa\python.exe
+Rscript MOFA.R
 ```
 
 ## Load Data

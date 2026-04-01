@@ -35,10 +35,36 @@ library(survminer)
 
 ## ----------------------------------------------------------------
 # Configure Python environment
-py_config()
+configured_python <- Sys.getenv("MOFA_PYTHON", unset = "")
+if (nzchar(configured_python)) {
+  message(sprintf("Using Python from MOFA_PYTHON: %s", configured_python))
+  use_python(configured_python, required = TRUE)
+} else {
+  message("MOFA_PYTHON is not set; using reticulate default Python discovery.")
+}
 
-# Use specific Python executable
-use_python("../python.exe")
+python_config <- tryCatch(
+  py_config(),
+  error = function(e) {
+    stop(
+      paste(
+        "Unable to initialize Python via reticulate.",
+        "Install Python and required packages, or set MOFA_PYTHON to a valid interpreter path.",
+        sprintf("Original error: %s", conditionMessage(e))
+      )
+    )
+  }
+)
+
+if (!py_module_available("mofapy2")) {
+  stop(
+    paste(
+      "Python was found, but the MOFA backend package 'mofapy2' is unavailable.",
+      "Install it in the active Python environment (for example: pip install mofapy2)",
+      "or set MOFA_PYTHON to a Python interpreter where 'mofapy2' is installed."
+    )
+  )
+}
 
 
 ## ----------------------------------------------------------------
